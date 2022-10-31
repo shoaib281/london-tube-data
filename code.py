@@ -1,111 +1,52 @@
 import psycopg2
 import json
 
-
 connection = psycopg2.connect(database="vaticle", user="mydatabaseuser", password="p", host="localhost", port=5432)
 
-cursor = connection.cursor()
+def createTables():
 
-cursor.execute("CREATE TABLE stations (stationId VARCHAR(255) PRIMARY KEY, stationName VARCHAR(255), longitude decimal, latitude decimal)")
+    cursor = connection.cursor()
 
-cursor.execute("CREATE TABLE lines (lineId SERIAL PRIMARY KEY, lineName VARCHAR(255))")
+    cursor.execute("CREATE TABLE stations (stationId VARCHAR(255) PRIMARY KEY, stationName VARCHAR(255), longitude decimal, latitude decimal)")
 
-cursor.execute("CREATE TABLE lineStation (lineStationId SERIAL PRIMARY KEY, stationId VARCHAR(255) REFERENCES stations, lineId SERIAL REFERENCES lines)")
+    cursor.execute("CREATE TABLE lines (lineId SERIAL PRIMARY KEY, lineName VARCHAR(255))")
 
-cursor.close()
+    cursor.execute("CREATE TABLE lineStation (lineStationId SERIAL PRIMARY KEY, stationId VARCHAR(255) REFERENCES stations, lineId SERIAL REFERENCES lines)")
 
-with open("train-network.json") as file:
-    data  = json.load(file)
+    cursor.close()
 
-    stations = data["stations"]
-    lines = data["lines"]
+def loadData():
+    with open("train-network.json") as file:
+        data  = json.load(file)
 
-    stationCursor = connection.cursor()
+        stations = data["stations"]
+        lines = data["lines"]
 
-    sql = "INSERT INTO stations (stationId, stationName, longitude, latitude) VALUES (%s, %s, %s, %s)"
+        stationCursor = connection.cursor()
 
-    for station in stations:
-        stationCursor.execute(sql, (station["id"], station["name"], station["longitude"], station["latitude"], ))
+        sql = "INSERT INTO stations (stationId, stationName, longitude, latitude) VALUES (%s, %s, %s, %s)"
 
-    stationCursor.close()
+        for station in stations:
+            stationCursor.execute(sql, (station["id"], station["name"], station["longitude"], station["latitude"], ))
 
-    lineCursor = connection.cursor()
-        
-    sql = "INSERT INTO lines (lineName) VALUES (%s) RETURNING lineId"
-    sql2 = "INSERT INTO lineStation (stationId, lineId) VALUES (%s, %s)"
+        stationCursor.close()
 
-    for line in lines:
-       lineCursor.execute(sql, (line["name"], )) 
-       lineId = lineCursor.fetchone()[0]
-
-       for station in line["stations"]:
-           lineCursor.execute(sql2, (station, lineId, ))
-
-    lineCursor.close()
-
-queryCursor = connection.cursor()
-
-while True:
-    mode = input("station(s) or line(l)")
-
-
-    if mode.lower() == "s":
-
-        station = input("input station ")
-
-        sql = "SELECT stationId FROM stations WHERE stationName= %s"
-
-        queryCursor.execute(sql, (station, ))
-
-        stationId = queryCursor.fetchone()[0]
-        
-
-        sql = "SELECT lineId FROM lineStation WHERE stationId= %s"
-
-        queryCursor.execute(sql, (stationId, ))
-
-        lineIds = queryCursor.fetchall()
-
-        print(f"There are {len(lineIds)} lines")
-
-        sql = "SELECT lineName FROM lines WHERE lineId = %s "
-        for lineId in lineIds:
-            queryCursor.execute(sql, (lineId, ))
-
-            line = queryCursor.fetchone()
+        lineCursor = connection.cursor()
             
-            print(line[0])
+        sql = "INSERT INTO lines (lineName) VALUES (%s) RETURNING lineId"
+        sql2 = "INSERT INTO lineStation (stationId, lineId) VALUES (%s, %s)"
 
+        for line in lines:
+           lineCursor.execute(sql, (line["name"], )) 
+           lineId = lineCursor.fetchone()[0]
 
-    elif mode.lower() == "l":
-        line = input("input line ")
+           for station in line["stations"]:
+               lineCursor.execute(sql2, (station, lineId, ))
 
-        sql = "SELECT lineId FROM lines WHERE lineName = %s"
+        lineCursor.close()
 
-        queryCursor.execute(sql, (line, ))
+from query import querying
 
-        lineId = queryCursor.fetchone()[0]
-
-        sql = "SELECT stationId from lineStation WHERE lineId= %s"
-
-        queryCursor.execute(sql, (lineId, ))
-
-        stationIds = queryCursor.fetchall()
-
-        print(f"There are {len(stationIds)} stations")
-
-        sql = "SELECT stationName from stations WHERE stationId= %s"
-
-        for stationId in stationIds:
-            queryCursor.execute(sql, (stationId, ))
-
-            station = queryCursor.fetchone()
-
-            print(station[0])
-
-        
-    elif mode.lower() == "l":
-        break
-    else:
-        print("Invalid input please try again")
-
+createTables()
+loadData()
+querying.main()
