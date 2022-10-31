@@ -32,14 +32,80 @@ with open("train-network.json") as file:
     lineCursor = connection.cursor()
         
     sql = "INSERT INTO lines (lineName) VALUES (%s) RETURNING lineId"
-    sql2 = "INSERT INTO lineStation (stationId, lineId) (%s, %s)"
+    sql2 = "INSERT INTO lineStation (stationId, lineId) VALUES (%s, %s)"
 
     for line in lines:
        lineCursor.execute(sql, (line["name"], )) 
        lineId = lineCursor.fetchone()[0]
 
        for station in line["stations"]:
-           print(lineId, station)
-           lineCursor.execute(sql, (lineId, station, ))
+           lineCursor.execute(sql2, (station, lineId, ))
 
     lineCursor.close()
+
+queryCursor = connection.cursor()
+
+while True:
+    mode = input("station(s) or line(l)")
+
+
+    if mode.lower() == "s":
+
+        station = input("input station ")
+
+        sql = "SELECT stationId FROM stations WHERE stationName= %s"
+
+        queryCursor.execute(sql, (station, ))
+
+        stationId = queryCursor.fetchone()[0]
+        
+
+        sql = "SELECT lineId FROM lineStation WHERE stationId= %s"
+
+        queryCursor.execute(sql, (stationId, ))
+
+        lineIds = queryCursor.fetchall()
+
+        print(f"There are {len(lineIds)} lines")
+
+        sql = "SELECT lineName FROM lines WHERE lineId = %s "
+        for lineId in lineIds:
+            queryCursor.execute(sql, (lineId, ))
+
+            line = queryCursor.fetchone()
+            
+            print(line[0])
+
+
+    elif mode.lower() == "l":
+        line = input("input line ")
+
+        sql = "SELECT lineId FROM lines WHERE lineName = %s"
+
+        queryCursor.execute(sql, (line, ))
+
+        lineId = queryCursor.fetchone()[0]
+
+        sql = "SELECT stationId from lineStation WHERE lineId= %s"
+
+        queryCursor.execute(sql, (lineId, ))
+
+        stationIds = queryCursor.fetchall()
+
+        print(f"There are {len(stationIds)} stations")
+
+        sql = "SELECT stationName from stations WHERE stationId= %s"
+
+        for stationId in stationIds:
+            queryCursor.execute(sql, (stationId, ))
+
+            station = queryCursor.fetchone()
+
+            print(station[0])
+
+        
+    elif mode.lower() == "l":
+        break
+    else:
+        print("Invalid input please try again")
+
